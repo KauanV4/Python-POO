@@ -1,6 +1,20 @@
 from dataclasses import dataclass, field, asdict
-import json
-import time
+
+
+
+
+registros = [
+    {"descricao": "  mercado ", "valor": 120.5, "categoria": " alimentação "},
+    {"descricao": "Ônibus", "valor": 4.5},
+    {"descricao": "Cinema", "valor": -30},
+    {"descricao": "   ", "valor": 10},
+    {"valor": 50},
+    {"descricao": "Livro", "valor": "abc"},
+]
+
+
+
+
 
 
 @dataclass
@@ -11,222 +25,126 @@ class Gasto:
 
     def __post_init__(self):
         if not isinstance(self.descricao, str):
-            raise ValueError("Descrição inválida")
-
+            raise ValueError (f"Descrição invalida")
         self.descricao = self.descricao.strip()
-
-        if not self.descricao:
-            raise ValueError("Descrição vazia")
-
-        if not isinstance(self.valor, (int, float)) or isinstance(self.valor, bool) or self.valor <= 0:
-            raise ValueError("Valor inválido")
-
+        if self.descricao == "":
+            raise ValueError (f"Descrição vazia")
+        if not isinstance(self.valor, (float, int)) or self.valor <= 0:
+            raise ValueError (f"Valor invalido: {self.valor}")
         self.categoria = self.categoria.strip().title()
-
-        if not self.categoria:
+        if self.categoria == "":
             self.categoria = "Outros"
 
     @classmethod
     def from_dict(cls, dados):
-        return cls(
-            dados["descricao"],
-            dados["valor"],
-            dados.get("categoria", "Outros")
-        )
+        descricao = dados["descricao"]
+        valor = dados["valor"]
+        categoria = dados.get("categoria", "Outros")
+        return cls(descricao, valor, categoria)
 
     def to_dict(self):
         return asdict(self)
 
+
     def __str__(self):
-        return (
-            f"{self.descricao} | "
-            f"R$ {self.valor:.2f} | "
-            f"{self.categoria}"
-        )
+        return f"descricao: {self.descricao} | valor: R${self.valor} | categoria: {self.categoria}"
+
+
 
 
 @dataclass
 class Extrato:
     gastos: list = field(default_factory=list)
 
+
+
+
     @classmethod
-    def from_lista(cls, registros):
+    def from_lista(cls,registro):
         gastos = []
         erros = []
-
-        for registro in registros:
+        for r in registro:
             try:
-                gastos.append(Gasto.from_dict(registro))
-            except (KeyError, ValueError) as erro:
+             gasto = Gasto.from_dict(r)
+             gastos.append(gasto)
+            except KeyError as erro:
+                erros.append(f"campo ausente: {erro}")
+            except ValueError as erro:
                 erros.append(str(erro))
-
         return cls(gastos), erros
+
 
     def __len__(self):
         return len(self.gastos)
 
+
     def __str__(self):
         if not self.gastos:
-            return "Extrato vazio"
+            return "Extrato Vazio"
+        return "\n".join(str(gasto) for gasto in self.gastos)
 
-        return "\n".join(
-            f"{i + 1}. {gasto}"
-            for i, gasto in enumerate(self.gastos)
-        )
+
+
 
     @property
     def total(self):
-        return round(sum(g.valor for g in self.gastos), 2)
+        return round(sum(gasto.valor for gasto in self.gastos), 2)
+
+
+
 
     def por_categoria(self):
         totais = {}
-
         for gasto in self.gastos:
-            categoria = gasto.categoria
-            totais[categoria] = totais.get(categoria, 0) + gasto.valor
-
-        return {
-            categoria: round(valor, 2)
-            for categoria, valor in totais.items()
-        }
-
-
-# FUNÇÕES DO SISTEMA
-
-def cadastrar_gasto(extrato):
-    try:
-        descricao = input("Descrição: ")
-        valor = float(input("Valor: ").replace(",", "."))
-        categoria = input("Categoria: ")
-
-        gasto = Gasto(descricao, valor, categoria)
-        extrato.gastos.append(gasto)
-
-        print("\nGasto cadastrado com sucesso!")
-
-    except ValueError as erro:
-        print(f"\nErro: {erro}")
-
-
-def mostrar_extrato(extrato):
-    print("\n--- EXTRATO ---")
-    print(extrato)
-
-
-def mostrar_total(extrato):
-    print(f"\nTotal de gastos: R$ {extrato.total:.2f}")
-
-
-def mostrar_categorias(extrato):
-    print("\n--- GASTOS POR CATEGORIA ---")
-
-    for categoria, valor in extrato.por_categoria().items():
-        print(f"{categoria}: R$ {valor:.2f}")
-
-
-def remover_gasto(extrato):
-    if not extrato.gastos:
-        print("\nNão existem gastos cadastrados.")
-        return
-
-    mostrar_extrato(extrato)
-
-    try:
-        indice = int(input("\nNúmero do gasto para remover: ")) - 1
-
-        gasto = extrato.gastos.pop(indice)
-        print(f"\nGasto '{gasto.descricao}' removido.")
-
-    except (ValueError, IndexError):
-        print("\nOpção inválida.")
-
-
-def salvar_json(extrato):
-    dados = [gasto.to_dict() for gasto in extrato.gastos]
-
-    with open("gastos.json", "w", encoding="utf-8") as arquivo:
-        json.dump(dados, arquivo, ensure_ascii=False, indent=4)
-
-    print("\nDados salvos!")
-
-
-def carregar_json():
-    try:
-        with open("gastos.json", "r", encoding="utf-8") as arquivo:
-            registros = json.load(arquivo)
-
-        extrato, erros = Extrato.from_lista(registros)
-
-        if erros:
-            print(f"\nForam encontrados {len(erros)} registros inválidos.")
-
-        return extrato
-
-    except FileNotFoundError:
-        return Extrato()
-
-    except (json.JSONDecodeError, OSError) as erro:
-        print(f"\nErro ao carregar arquivo: {erro}")
-        return Extrato()
+            if gasto.categoria in totais:
+                totais[gasto.categoria] += gasto.valor
+            else:
+                totais[gasto.categoria] = gasto.valor
+        for categoria, valor in totais.items():
+            totais[categoria] = round(valor, 2)
+        return totais
 
 
 
-# MENU DE INTERAÇÃO!!!
+def criar_gastos(registros):
+    gastos = []
+    erros = []
+    for r in registros:
+        try:
+            gastos.append(Gasto(r["descricao"], r["valor"], r.get("categoria", "Outros")))
+        except ValueError as erro:
+            erros.append(str(erro))
+        except KeyError as erro:
+            erros.append(f"Campo ausente: {erro}")
+    return gastos, erros
 
 
-def main():
-    extrato = carregar_json()
-
-    while True:
-        print("""
-========== CONTROLE DE GASTOS ==========
-
-1 - Cadastrar gasto
-2 - Mostrar extrato
-3 - Mostrar total
-4 - Gastos por categoria
-5 - Remover gasto
-6 - Salvar dados
-0 - Sair
-
-========================================
-""")
-        time.sleep(2)
-
-        opcao = input("Escolha uma opção: ")
-
-        if opcao == "1":
-            cadastrar_gasto(extrato)
-            time.sleep(1.5)
-
-        elif opcao == "2":
-            mostrar_extrato(extrato)
-            time.sleep(2)
-            input("\nPressione ENTER para voltar ao menu")
-
-        elif opcao == "3":
-            mostrar_total(extrato)
-            input("\nPressione ENTER para voltar ao menu")
-
-        elif opcao == "4":
-            mostrar_categorias(extrato)
-            input("\nPressione ENTER para voltar ao menu")
-
-        elif opcao == "5":
-            remover_gasto(extrato)
-            input("\nPressione ENTER para voltar ao menu")
-
-        elif opcao == "6":
-            salvar_json(extrato)
-
-        elif opcao == "0":
-            salvar_json(extrato)
-            print("\nEncerrando sistema...")
-            break
-
-        else:
-            print("\nOpção inválida!")
 
 
-if __name__ == "__main__":
-    main()
+
+
+gastos, erros = criar_gastos(registros)
+
+for g in gastos:
+    print(g)
+
+print(len(erros))
+for e in erros:
+    print(e)
+
+print(sum(g.valor for g in gastos))
+print(criar_gastos([]))
+
+
+
+extrato, erros = Extrato.from_lista(registros)
+
+print(len(extrato))
+print(extrato)
+print(extrato.total)
+print(extrato.por_categoria())
+print(erros)
+print(Gasto.from_dict({"descricao": "Livro", "valor": 40}).to_dict())
+
+vazio, erros_vazio = Extrato.from_lista([])
+print(vazio, len(vazio), erros_vazio)
