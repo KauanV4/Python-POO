@@ -16,5 +16,5 @@ class Aluno:
 
 
 a = Aluno.from_dict({"nome": " lia ", "nota": 8.5})
-print(a)             # Aluno(nome='Lia', nota=8.5)
-print(a.to_dict())   # {'nome': 'Lia', 'nota': 8.5}
+print(a)             
+print(a.to_dict())
